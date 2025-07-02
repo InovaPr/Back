@@ -3,7 +3,7 @@ const sqlite3 = require('sqlite3').verbose();
 const cors = require('cors');
 const path = require('path');
 const app = express();
-const PORT = 3000;
+const PORT = process.env.PORT || 3000; // CORREÇÃO: Porta dinâmica para Render
 
 // Middleware
 app.use(cors());
@@ -133,7 +133,7 @@ app.get('/chamados/:id', (req, res) => {
   });
 });
 
-// Inicie o servidor
-app.listen(PORT, '0.0.0.0', () => {
-  console.log(`Servidor rodando em http://192.168.0.31:${PORT}`);
+// Inicie o servidor - CORREÇÃO: não use IP local fixo!
+app.listen(PORT, () => {
+  console.log(`Servidor rodando na porta ${PORT}`);
 });
