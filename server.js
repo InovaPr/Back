@@ -1,9 +1,15 @@
 const express = require('express');
-const sqlite3 = require('sqlite3').verbose();
+const { Pool } = require('pg'); // Usando PostgreSQL
 const cors = require('cors');
 const path = require('path');
 const app = express();
-const PORT = process.env.PORT || 3000; // CORREÇÃO: Porta dinâmica para Render
+const PORT = process.env.PORT || 3000; // Porta dinâmica para Render
+
+// Configuração do pool do Postgres (DATABASE_URL já é padrão no Render)
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: process.env.NODE_ENV === "production" ? { rejectUnauthorized: false } : false
+});
 
 // Middleware
 app.use(cors());
@@ -12,94 +18,96 @@ app.use(express.json());
 // Servir arquivos estáticos (HTML, CSS, JS, imagens) da pasta 'public'
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Rotas de API
-const db = new sqlite3.Database('./meubanco.db', (err) => {
-  if (err) return console.error(err.message);
-  db.run(`CREATE TABLE IF NOT EXISTS chamados_abertos (
-    id TEXT PRIMARY KEY,
-    tempo_previsto TEXT,
-    cliente TEXT,
-    problema TEXT,
-    operador TEXT,
-    executor TEXT,
-    hora_inicio TEXT,
-    data_abertura TEXT,
-    hora_fim TEXT,
-    timerState TEXT,
-    timerType TEXT,
-    accumulatedTime TEXT,
-    startTime TEXT
-  )`);
-  db.run(`CREATE TABLE IF NOT EXISTS chamados_arquivados (
-    id TEXT PRIMARY KEY,
-    tempo_previsto TEXT,
-    cliente TEXT,
-    problema TEXT,
-    operador TEXT,
-    executor TEXT,
-    data_hora_abertura TEXT,
-    hora_fim TEXT,
-    arquivado_por TEXT,
-    inicio TEXT,
-    fim TEXT,
-    tempo_decorrido TEXT,
-    status_prazo TEXT
-  )`);
-  // Tabela principal para /chamados
-  db.run(`
-    CREATE TABLE IF NOT EXISTS chamados (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      titulo TEXT NOT NULL,
-      descricao TEXT NOT NULL,
-      criado_em DATETIME DEFAULT CURRENT_TIMESTAMP
-    )
-  `);
+// Endpoints CHAMADOS ABERTOS
+app.get('/chamados_abertos', async (req, res) => {
+  try {
+    const result = await pool.query('SELECT * FROM chamados_abertos');
+    res.json(result.rows);
+  } catch (err) {
+    res.status(500).json({ erro: err.message });
+  }
 });
 
-// Endpoints CHAMADOS ABERTOS
-app.get('/chamados_abertos', (req, res) => {
-  db.all('SELECT * FROM chamados_abertos', [], (err, rows) => {
-    if (err) return res.status(500).json({erro: err.message});
-    res.json(rows);
-  });
-});
-app.post('/chamados_abertos', (req, res) => {
+app.post('/chamados_abertos', async (req, res) => {
   const t = req.body;
-  db.run(`INSERT OR REPLACE INTO chamados_abertos VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    [t.id, t.tempo_previsto, t.cliente, t.problema, t.operador, t.executor, t.hora_inicio, t.data_abertura, t.hora_fim, t.timerState, t.timerType, t.accumulatedTime, t.startTime],
-    function (err) {
-      if (err) return res.status(500).json({erro: err.message});
-      res.json({ok: true, id: t.id});
-    });
+  try {
+    await pool.query(
+      `INSERT INTO chamados_abertos (id, tempo_previsto, cliente, problema, operador, executor, hora_inicio, data_abertura, hora_fim, timerState, timerType, accumulatedTime, startTime)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
+       ON CONFLICT (id) DO UPDATE SET
+         tempo_previsto=EXCLUDED.tempo_previsto,
+         cliente=EXCLUDED.cliente,
+         problema=EXCLUDED.problema,
+         operador=EXCLUDED.operador,
+         executor=EXCLUDED.executor,
+         hora_inicio=EXCLUDED.hora_inicio,
+         data_abertura=EXCLUDED.data_abertura,
+         hora_fim=EXCLUDED.hora_fim,
+         timerState=EXCLUDED.timerState,
+         timerType=EXCLUDED.timerType,
+         accumulatedTime=EXCLUDED.accumulatedTime,
+         startTime=EXCLUDED.startTime`,
+      [t.id, t.tempo_previsto, t.cliente, t.problema, t.operador, t.executor, t.hora_inicio, t.data_abertura, t.hora_fim, t.timerState, t.timerType, t.accumulatedTime, t.startTime]
+    );
+    res.json({ ok: true, id: t.id });
+  } catch (err) {
+    res.status(500).json({ erro: err.message });
+  }
 });
-app.delete('/chamados_abertos/:id', (req, res) => {
-  db.run('DELETE FROM chamados_abertos WHERE id = ?', [req.params.id], function (err) {
-    if (err) return res.status(500).json({erro: err.message});
-    res.json({ok: true});
-  });
+
+app.delete('/chamados_abertos/:id', async (req, res) => {
+  try {
+    await pool.query('DELETE FROM chamados_abertos WHERE id = $1', [req.params.id]);
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ erro: err.message });
+  }
 });
 
 // Endpoints CHAMADOS ARQUIVADOS
-app.get('/chamados_arquivados', (req, res) => {
-  db.all('SELECT * FROM chamados_arquivados', [], (err, rows) => {
-    if (err) return res.status(500).json({erro: err.message});
-    res.json(rows);
-  });
+app.get('/chamados_arquivados', async (req, res) => {
+  try {
+    const result = await pool.query('SELECT * FROM chamados_arquivados');
+    res.json(result.rows);
+  } catch (err) {
+    res.status(500).json({ erro: err.message });
+  }
 });
-app.post('/chamados_arquivados', (req, res) => {
+
+app.post('/chamados_arquivados', async (req, res) => {
   const t = req.body;
-  db.run(`INSERT OR REPLACE INTO chamados_arquivados VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    [t.id, t.tempo_previsto, t.cliente, t.problema, t.operador, t.executor, t.data_hora_abertura, t.hora_fim, t.arquivado_por, t.inicio, t.fim, t.tempo_decorrido, t.status_prazo],
-    function (err) {
-      if (err) return res.status(500).json({erro: err.message});
-      res.json({ok: true, id: t.id});
-    });
+  try {
+    await pool.query(
+      `INSERT INTO chamados_arquivados (id, tempo_previsto, cliente, problema, operador, executor, data_hora_abertura, hora_fim, arquivado_por, inicio, fim, tempo_decorrido, status_prazo)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
+       ON CONFLICT (id) DO UPDATE SET
+         tempo_previsto=EXCLUDED.tempo_previsto,
+         cliente=EXCLUDED.cliente,
+         problema=EXCLUDED.problema,
+         operador=EXCLUDED.operador,
+         executor=EXCLUDED.executor,
+         data_hora_abertura=EXCLUDED.data_hora_abertura,
+         hora_fim=EXCLUDED.hora_fim,
+         arquivado_por=EXCLUDED.arquivado_por,
+         inicio=EXCLUDED.inicio,
+         fim=EXCLUDED.fim,
+         tempo_decorrido=EXCLUDED.tempo_decorrido,
+         status_prazo=EXCLUDED.status_prazo`,
+      [t.id, t.tempo_previsto, t.cliente, t.problema, t.operador, t.executor, t.data_hora_abertura, t.hora_fim, t.arquivado_por, t.inicio, t.fim, t.tempo_decorrido, t.status_prazo]
+    );
+    res.json({ ok: true, id: t.id });
+  } catch (err) {
+    res.status(500).json({ erro: err.message });
+  }
 });
-app.delete('/chamados_arquivados', (req, res) => {
-  db.run('DELETE FROM chamados_arquivados', [], function (err) {
-    if (err) return res.status(500).json({erro: err.message});
-    res.json({ok: true});
-  });
+
+app.delete('/chamados_arquivados', async (req, res) => {
+  try {
+    await pool.query('DELETE FROM chamados_arquivados');
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ erro: err.message });
+  }
 });
 
 // Rota para servir index.html na raiz
@@ -108,32 +116,43 @@ app.get('/', (req, res) => {
 });
 
 // GET /chamados – lista todos os chamados
-app.get('/chamados', (req, res) => {
-  db.all('SELECT * FROM chamados ORDER BY criado_em DESC', [], (err, rows) => {
-    if (err) return res.status(500).json({error: err.message});
-    res.json(rows);
-  });
+app.get('/chamados', async (req, res) => {
+  try {
+    const result = await pool.query('SELECT * FROM chamados ORDER BY criado_em DESC');
+    res.json(result.rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // POST /chamados – cria um chamado
-app.post('/chamados', (req, res) => {
+app.post('/chamados', async (req, res) => {
   const { titulo, descricao } = req.body;
-  db.run('INSERT INTO chamados (titulo, descricao) VALUES (?, ?)', [titulo, descricao], function(err) {
-    if (err) return res.status(500).json({error: err.message});
-    res.status(201).json({ id: this.lastID, titulo, descricao, criado_em: new Date() });
-  });
+  try {
+    const result = await pool.query(
+      'INSERT INTO chamados (titulo, descricao) VALUES ($1, $2) RETURNING id, titulo, descricao, criado_em',
+      [titulo, descricao]
+    );
+    res.status(201).json(result.rows[0]);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // GET /chamados/:id – pega um chamado específico
-app.get('/chamados/:id', (req, res) => {
-  db.get('SELECT * FROM chamados WHERE id = ?', [req.params.id], (err, row) => {
-    if (err) return res.status(500).json({error: err.message});
-    if (!row) return res.status(404).json({error: 'Chamado não encontrado'});
-    res.json(row);
-  });
+app.get('/chamados/:id', async (req, res) => {
+  try {
+    const result = await pool.query('SELECT * FROM chamados WHERE id = $1', [req.params.id]);
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Chamado não encontrado' });
+    }
+    res.json(result.rows[0]);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
-// Inicie o servidor - CORREÇÃO: não use IP local fixo!
+// Inicie o servidor
 app.listen(PORT, () => {
   console.log(`Servidor rodando na porta ${PORT}`);
 });
