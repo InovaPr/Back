@@ -1,9 +1,9 @@
 const express = require('express');
-const { Pool } = require('pg'); // Usando PostgreSQL
+const { Pool } = require('pg'); // não esqueça do require
 const cors = require('cors');
 const path = require('path');
 const app = express();
-const PORT = process.env.PORT || 3000; // Porta dinâmica para Render
+const PORT = process.env.PORT || 3000;
 
 // Configuração do pool do Postgres (DATABASE_URL já é padrão no Render)
 const pool = new Pool({
@@ -152,7 +152,7 @@ app.get('/chamados/:id', async (req, res) => {
   }
 });
 
-// Inicie o servidor
+// Inicie o servidor (apenas UMA VEZ, no final)
 app.listen(PORT, () => {
   console.log(`Servidor rodando na porta ${PORT}`);
 });
