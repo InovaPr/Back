@@ -1,0 +1,1146 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <title>Sistema de Acompanhamento de Chamados</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: Arial, sans-serif;
+        }
+
+        body {
+            padding: 20px;
+            background-color: #f0f0f0;
+        }
+
+        #loginContainer {
+            max-width: 300px;
+            margin: 50px auto;
+            padding: 20px;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        #mainContainer {
+            display: none;
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .input-group {
+            margin-bottom: 15px;
+        }
+
+        .input-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+
+        #slaStatistics {
+            display: flex;
+            justify-content: space-between;
+            background-color: #f4f4f4;
+            padding: 10px;
+            margin-bottom: 15px;
+            border-radius: 5px;
+        }
+
+        #slaStatistics .sla-stats {
+            display: flex;
+            gap: 20px;
+        }
+
+        #slaStatistics .sla-stats div {
+            background-color: white;
+            padding: 5px 10px;
+            border-radius: 3px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+
+        .ticket-row.compact {
+    /* Diminui o padding e altura para caber só os botões e o timer */
+    padding: 5px 10px;
+    min-height: 0;
+    height: auto;
+    grid-template-columns: unset;
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 10px;
+}
+.button-container.compact {
+    flex-direction: row !important;
+    gap: 3px;
+}
+
+.button-container {
+    display: flex;
+    gap: 5px;
+    flex-direction: row;
+    align-items: center;
+}
+
+        input, select {
+            width: 100%;
+            padding: 8px;
+            margin-bottom: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+
+        button {
+            background-color: #007bff;
+            color: white;
+            padding: 10px 15px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+
+        button:hover {
+            background-color: #0056b3;
+        }
+
+        .ticket-row {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+            gap: 10px;
+            padding: 15px;
+            background-color: #f9f9f9;
+            margin-bottom: 10px;
+            border-radius: 4px;
+            align-items: center;
+        }
+
+        .timer {
+            font-size: 1.2em;
+            font-weight: bold;
+        }
+
+        .green { background-color: #90EE90 !important; }
+        .yellow { background-color: #FFFF99 !important; }
+        .orange { background-color: #FFB366 !important; }
+        .red { background-color: #FF9999 !important; }
+
+        #ticketList {
+            margin-top: 20px;
+        }
+
+        .error-message {
+            color: red;
+            margin-top: 5px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+
+        th, td {
+            padding: 10px;
+            border: 1px solid #ddd;
+            text-align: left;
+        }
+
+        th {
+            background-color: #007bff;
+        }
+    </style>
+</head>
+<body>
+    <div id="loginContainer">
+        <h2>Login</h2>
+        <div class="input-group">
+            <label for="username">Usuário:</label>
+            <input type="text" id="username" required>
+        </div>
+        <div class="input-group">
+            <label for="password">Senha:</label>
+            <input type="password" id="password" required>
+        </div>
+        <button onclick="login()">Entrar</button>
+        <p id="loginError" class="error-message"></p>
+    </div>
+
+   <div id="mainContainer">
+    <h1>Sistema de Acompanhamento de Chamados</h1>
+    <button onclick="addNewTicket()">Adicionar Novo Chamado</button>
+    <button onclick="showDatabase()">Visualizar Chamados</button>
+    <button onclick="showGraphs()">Visualizar Graficos</button>
+    <button onclick="logout()">Logout</button>
+    <div id="ticketList"></div>
+
+
+    <div id="databaseView" style="display: none;">
+        <h2>Registros de Chamados</h2>
+        <div class="input-group">
+            <label>Filtrar por PROBLEMA:</label>
+            <input list="problemaOptions" id="filterPR">
+            <datalist id="problemaOptions">
+                <option value="Acesso Lento"></option>
+                <option value="Acréscimo de canais"></option>
+            </datalist>
+
+            <label>Filtrar por CLIENTE:</label>
+            <input list="clienteOptions" id="filterCliente">
+            <datalist id="clienteOptions">
+                <option value="476"></option>
+                <option value="490"></option>
+            </datalist>
+
+            <label>Filtrar por OPERADOR:</label>
+            <input list="operadorOptions" id="filterOperador">
+            <datalist id="operadorOptions">
+                <option value="Castelo"></option>
+                <option value="Marcelo"></option>
+                <option value="kaline"></option>
+                <option value="Gabriel"></option>
+                <option value="Jefferson"></option>
+            </datalist>
+            
+            <label>Filtrar por EXECUTOR:</label>
+            <input list="executorOptions" id="filterEX">
+            <datalist id="executorOptions">
+                <option value="Airton"></option>
+                <option value="Damião"></option>
+                <option value="Daniel"></option>
+                <option value="Alison"></option>
+            </datalist>
+
+            <label>Filtrar por STATUS DO PRAZO:</label>
+            <input list="statusOptions" id="filterStatus">
+            <datalist id="statusOptions">
+                <option value="No Prazo"></option>
+                <option value="Fora do Prazo"></option>
+            </datalist>
+    
+            <label>Filtrar por INTERVALO DE DATAS:</label>
+            <input type="text" id="filterDateRange" placeholder="Selecione o intervalo de datas">
+            <button onclick="applyFilters()">Aplicar Filtros</button>
+            <button onclick="downloadExcel()">Download Excel</button>
+            <button onclick="clearDatabase()">Limpar Banco de Dados</button>
+
+        <table id="databaseTable">
+            <thead>
+                <tr>
+                    <th>TEMPO</th>
+                    <th>CLIENTE</th>
+                    <th>PROBLEMA</th>
+                    <th>OPERADOR</th>
+                    <th>EXECUTOR</th>
+                    <th>HORA DE ABERTURA</th>
+                    <th>ARQUIVADO POR:</th>
+                    <th>HORA DE ENCERRAMENTO</th>
+                    <th>TEMPO DE EXECUÇÃO</th>
+                    <th>STATUS DO PRAZO</th>
+                </tr>
+            </thead>
+            <tbody id="databaseTableBody"></tbody>
+        </table>
+    </div>
+</div>
+
+<div id="graphsView" style="display: none;">
+    <div class="container">
+        <h2>Gráficos</h2>
+
+        <div class="charts" style="display: flex; justify-content: space-between;">
+            <div class="chart-container" style="flex: 1; padding: 10px;">
+                <h3>Prazos</h3>
+                
+                <div class="filters" style="margin-bottom: 10px;">
+                    <div class="filter">
+                        <label for="customerFilterPie">Clientes:</label>
+                        <select id="customerFilterPie">
+                            <option value="all">Todos</option>
+                            <option value="476">476</option>
+                        </select>
+                    </div>
+                    <div class="filter">
+                        <label for="problemFilterPie">Tipo de Problema:</label>
+                        <select id="problemFilterPie">
+                            <option value="all">Todos</option>
+                            <option value="Acesso Lento">Acesso Lento</option>
+                            <option value="Acréscimo de canais">Acréscimo de canais</option>
+                        </select>
+                    </div>
+                    <div class="filter">
+                        <label for="dateFilterPie">Data:</label>
+                        <input type="date" id="dateFilterPie">
+                    </div>
+                </div>
+                <canvas id="pieChart" style="max-width: 300px; max-height: 300px;"></canvas>
+                <button onclick="renderGraphs()">Aplicar Filtros</button>
+            </div>
+
+            <div class="chart-container" style="flex: 1; padding: 10px;">
+                <h3>Problemas</h3>
+                <div class="filters" style="margin-bottom: 10px;">
+                    <div class="filter">
+                        <label for="customerFilterBar">Clientes:</label>
+                        <select id="customerFilterBar">
+                            <option value="all">Todos</option>
+                            <option value="476">476</option>
+                            <option value="490">490</option>
+                        </select>
+                    </div>
+                    <div class="filter">
+                        <label for="problemFilterBar">Tipo de Problema:</label>
+                        <select id="problemFilterBar">
+                            <option value="all">Todos</option>
+                            <option value="Acesso Lento">Acesso Lento</option>
+                            <option value="Acréscimo de canais">Acréscimo de canais</option>
+                        </select>
+                    </div>
+                    <div class="filter">
+                        <label for="dateFilterBar">Intervalo de Datas:</label>
+                        <input type="text" id="dateFilterBar" placeholder="Selecione o intervalo de datas">
+                    </div>
+                </div>
+                <canvas id="barChart" style="max-width: 300px; max-height: 300px;"></canvas>
+                <button onclick="renderGraphs()">Aplicar Filtros</button>
+            </div>
+        </div>
+        <button onclick="downloadGraphsAsWord()">Download gráficos em Word</button>
+    </div>
+</div>
+
+<script>
+    const API_URL = 'https://seu-backend.onrender.com';
+    let socket;
+
+    function initializeWebSocket() {
+        socket = new WebSocket('wss://inovanet.ind.br/websocket');
+
+        socket.onopen = () => {
+            console.log('Conexão WebSocket estabelecida');
+        };
+
+        socket.onmessage = (event) => {
+            console.log("Mensagem recebida via WebSocket:", event.data);
+            const data = JSON.parse(event.data);
+
+            if (data.tipo === 'novo_chamado') {
+                console.log('Novo chamado recebido:', data.chamado);
+                loadOpenTicketsFromServer(); // Recarrega todos os tickets do servidor
+            } else if (data.tipo === 'atualizacao_chamado') {
+                console.log('Chamado atualizado:', data.chamado);
+                updateTicket(data.chamado);
+            }
+        };
+
+        socket.onclose = () => {
+            console.log('Conexão WebSocket fechada. Tentando reconectar...');
+            setTimeout(initializeWebSocket, 5000);
+        };
+
+        socket.onerror = (error) => {
+            console.error('Erro no WebSocket:', error);
+        };
+    }
+
+    async function saveOpenTicketToServer(ticket) {
+    try {
+        await fetch('http://192.168.0.31:3000/chamados_abertos', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(ticket)
+        });
+        console.log('Chamado aberto salvo no servidor');
+    } catch (error) {
+        console.error('Erro ao salvar chamado aberto:', error);
+    }
+}
+
+    // SERVIDOR: Buscar chamados abertos do servidor
+ async function loadOpenTicketsFromServer() {
+    try {
+        const response = await fetch('http://192.168.0.31:3000/chamados_abertos');
+        const openTickets = await response.json();
+        const ticketList = document.getElementById('ticketList');
+        ticketList.innerHTML = '';
+        openTickets.forEach(ticket => addNewTicketToDOM(ticket));
+    } catch (error) {
+        console.error('Erro ao carregar chamados abertos:', error);
+    }
+}
+// Função para buscar chamados abertos no backend e exibir na tela
+async function loadArchivedTicketsFromServer() {
+    try {
+        const response = await fetch('http://192.168.0.31:3000/chamados_arquivados');
+        const archivedTickets = await response.json();
+        database = archivedTickets; // Atualiza o database local com dados do servidor
+        console.log('Chamados arquivados carregados do servidor:', database.length);
+    } catch (error) {
+        console.error('Erro ao carregar chamados arquivados:', error);
+        database = []; // Fallback para array vazio
+    }
+}
+
+function checkLoginState() {
+    const isLoggedIn = sessionStorage.getItem('isLoggedIn') === 'true';
+    if (isLoggedIn) {
+        document.getElementById('loginContainer').style.display = 'none';
+        document.getElementById('mainContainer').style.display = 'block';
+        // Carrega dados do servidor
+        loadArchivedTicketsFromServer();
+        loadOpenTicketsFromServer(); // <-- ESSA LINHA GARANTE QUE OS CHAMADOS ABERTOS VOLTAM APÓS ATUALIZAR
+    } else {
+        document.getElementById('loginContainer').style.display = 'block';
+        document.getElementById('mainContainer').style.display = 'none';
+    }
+}
+
+// Exemplo de inicialização ao abrir a página
+document.addEventListener('DOMContentLoaded', () => {
+    checkLoginState();
+
+});
+
+async function addNewTicket(ticket = {}) {
+    addNewTicketToDOM(ticket);
+
+}
+
+
+
+    // SERVIDOR: Remover chamado aberto do servidor (quando arquivar)
+    async function removeOpenTicketFromServer(ticketId) {
+        try {
+           await fetch(`http://192.168.0.31:3000/chamados_abertos/${ticketId}`, {
+    method: 'DELETE'
+});
+            console.log('Chamado aberto removido do servidor');
+        } catch (error) {
+            console.error('Erro ao remover chamado aberto:', error);
+        }
+    }
+
+    // SERVIDOR: Limpar banco de dados no servidor
+    async function clearDatabaseOnServer() {
+        try {
+          await fetch('http://192.168.0.31:3000/chamados_arquivados', {
+    method: 'DELETE'
+});
+            console.log('Banco de dados limpo no servidor');
+        } catch (error) {
+            console.error('Erro ao limpar banco de dados:', error);
+        }
+    }
+
+    function updateTicket(ticket) {
+        const ticketDiv = document.querySelector(`[data-ticket-id="${ticket.id}"]`);
+        if (ticketDiv) {
+            console.log('Chamado atualizado:', ticket);
+        } else {
+            console.error('Chamado não encontrado para atualização:', ticket);
+        }
+    }
+
+    function renderGraphs() {
+        const customerFilterPie = document.getElementById('customerFilterPie').value;
+        const customerFilterBar = document.getElementById('customerFilterBar').value;
+        const problemFilterPie = document.getElementById('problemFilterPie').value;
+        const problemFilterBar = document.getElementById('problemFilterBar').value;
+        const dateFilterPie = document.getElementById('dateFilterPie').value;
+        const dateFilterBar = document.getElementById('dateFilterBar').value;
+
+        let filteredPieData = database;
+        let filteredBarData = database;
+
+        if (customerFilterPie !== 'all') {
+            filteredPieData = filteredPieData.filter(ticket => ticket.cliente === customerFilterPie);
+        }
+        if (problemFilterPie !== 'all') {
+            filteredPieData = filteredPieData.filter(ticket => ticket.problema === problemFilterPie);
+        }
+        if (dateFilterPie) {
+            const selectedDate = new Date(dateFilterPie);
+            filteredPieData = filteredPieData.filter(ticket => {
+                const ticketDate = new Date(ticket.inicio);
+                return ticketDate.toDateString() === selectedDate.toDateString();
+            });
+        }
+
+        const pieDataValues = [0, 0];
+        filteredPieData.forEach(ticket => {
+            if (ticket.status_prazo === 'No Prazo') {
+                pieDataValues[0]++;
+            } else if (ticket.status_prazo === 'Fora do Prazo') {
+                pieDataValues[1]++;
+            }
+        });
+
+        const pieData = {
+            labels: ['Dentro do Prazo', 'Fora do Prazo'],
+            datasets: [{
+                data: pieDataValues,
+                backgroundColor: ['#36A2EB', '#FF6384'],
+                hoverBackgroundColor: ['#36A2EB', '#FF6384']
+            }]
+        };
+
+        if (customerFilterBar !== 'all') {
+            filteredBarData = filteredBarData.filter(ticket => ticket.cliente === customerFilterBar);
+        }
+        if (problemFilterBar !== 'all') {
+            filteredBarData = filteredBarData.filter(ticket => ticket.problema === problemFilterBar);
+        }
+        if (dateFilterBar) {
+            const selectedDate = new Date(dateFilterBar);
+            filteredBarData = filteredBarData.filter(ticket => {
+                const ticketDate = new Date(ticket.inicio);
+                return ticketDate.toDateString() === selectedDate.toDateString();
+            });
+        }
+
+        const barDataValues = {};
+        filteredBarData.forEach(ticket => {
+            const problem = ticket.problema;
+            if (!barDataValues[problem]) {
+                barDataValues[problem] = 0;
+            }
+            barDataValues[problem]++;
+        });
+
+        const barData = {
+            labels: Object.keys(barDataValues),
+            datasets: [{
+                label: 'Chamados',
+                data: Object.values(barDataValues),
+                backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                borderColor: 'rgba(75, 192, 192, 1)',
+                borderWidth: 1
+            }]
+        };
+
+        const pieOptions = {
+            responsive: true,
+            maintainAspectRatio: false,
+        };
+
+        const barOptions = {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: {
+                    beginAtZero: true
+                }
+            }
+        };
+
+        const pieCtx = document.getElementById('pieChart').getContext('2d');
+        new Chart(pieCtx, {
+            type: 'pie',
+            data: pieData,
+            options: pieOptions
+        });
+
+        const barCtx = document.getElementById('barChart').getContext('2d');
+        new Chart(barCtx, {
+            type: 'bar',
+            data: barData,
+            options: barOptions
+        });
+    }
+
+    function showGraphs() {
+        const graphsView = document.getElementById('graphsView');
+        graphsView.style.display = graphsView.style.display === 'none' ? 'block' : 'none';
+        if (graphsView.style.display === 'block') {
+            renderGraphs();
+
+            flatpickr("#dateFilterPie", {
+                mode: "range",
+                dateFormat: "d/m/Y",
+                locale: "pt",
+                onChange: function(selectedDates, dateStr, instance) {
+                    console.log('Datas selecionadas para Pie:', dateStr);
+                }
+            });
+
+            flatpickr("#dateFilterBar", {
+                mode: "range",
+                dateFormat: "d/m/Y",
+                locale: "pt",
+                onChange: function(selectedDates, dateStr, instance) {
+                    console.log('Datas selecionadas para Bar:', dateStr);
+                }
+            });
+        }
+    }
+
+    function downloadGraphsAsWord() {
+        const pieChart = document.getElementById('pieChart').toDataURL('image/png');
+        const barChart = document.getElementById('barChart').toDataURL('image/png');
+
+        const docContent = `
+        <html>
+        <head><meta charset="utf-8"></head>
+        <body>
+        <h2>Prazos</h2>
+        <img src="${pieChart}" alt="Gráfico de Pizza">
+        <h2>Problemas</h2>
+        <img src="${barChart}" alt="Gráfico de Barras">
+        </body>
+        </html>
+        `;
+
+        const blob = new Blob(['\ufeff', docContent], {
+            type: 'application/msword'
+        });
+
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = 'graficos.doc';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    }
+
+    function downloadExcel() {
+        let table = document.getElementById('databaseTable');
+        let wb = XLSX.utils.table_to_book(table, {sheet: "Sheet JS"});
+        XLSX.writeFile(wb, 'Chamados.xlsx');
+    }
+
+    function showDatabase() {
+        const databaseView = document.getElementById('databaseView');
+        databaseView.style.display = databaseView.style.display === 'none' ? 'block' : 'none';
+        
+        if (databaseView.style.display === 'block') {
+            updateDatabaseTable();
+        }
+    }
+
+    async function clearDatabase() {
+        if (confirm('Tem certeza que deseja limpar o banco de dados?')) {
+            await clearDatabaseOnServer(); // Limpa no servidor
+            database = []; // Limpa local
+            updateDatabaseTable();
+        }
+    }
+
+    function updateDatabaseTable(filters = {}) {
+        const tbody = document.getElementById('databaseTableBody');
+        tbody.innerHTML = '';
+
+        let filteredData = [...database];
+
+        if (filters.problema) {
+            filteredData = filteredData.filter(t => 
+                t.problema && t.problema.toLowerCase().includes(filters.problema.toLowerCase())
+            );
+        }
+        if (filters.operador) {
+            filteredData = filteredData.filter(t => 
+                t.operador && t.operador.toLowerCase().includes(filters.operador.toLowerCase())
+            );
+        }
+        if (filters.cliente) {
+            filteredData = filteredData.filter(t => 
+                t.cliente && t.cliente.toLowerCase().includes(filters.cliente.toLowerCase())
+            );
+        }
+        if (filters.executor) {
+            filteredData = filteredData.filter(t => 
+                t.executor && t.executor.toLowerCase().includes(filters.executor.toLowerCase())
+            );
+        }
+        if (filters.status) {
+            filteredData = filteredData.filter(t => 
+                t.status_prazo && t.status_prazo.toLowerCase().includes(filters.status.toLowerCase())
+            );
+        }
+
+        if (filters.startDate && filters.endDate) {
+            filteredData = filteredData.filter(ticket => {
+                if (!ticket.inicio) return false;
+                
+                const ticketDate = parseDateTimeStr(ticket.inicio);
+                if (!ticketDate) return false;
+
+                return ticketDate >= filters.startDate && ticketDate <= filters.endDate;
+            });
+        }
+
+        filteredData.forEach(ticket => {
+            const row = tbody.insertRow();
+            const cells = [
+                ticket.tempo_previsto || '',
+                ticket.cliente || '',
+                ticket.problema || '',
+                ticket.operador || '',
+                ticket.executor || '',
+                ticket.inicio || '',
+                ticket.arquivado_por || '',
+                ticket.fim || '',
+                ticket.tempo_decorrido || '',
+                ticket.status_prazo || ''
+            ];
+
+            cells.forEach(value => {
+                const cell = row.insertCell();
+                cell.textContent = value;
+            });
+
+            if (ticket.status_prazo === 'No Prazo') {
+                row.classList.add('green');
+            } else if (ticket.status_prazo === 'Fora do Prazo') {
+                row.classList.add('red');
+            }
+        });
+    }
+
+    const users = [
+        ["Jefferson", "123123"],
+        ["Castelo", "123123"],
+        ["Gabriel", "123123"],
+        ["Kaline", "123123"],
+        ["Virgilio", "123123"],
+        ["James", "123123"],
+        ["Iara", "123123"]
+    ];
+
+    const operadores = ["", "Castelo","kaline", "Gabriel", "Jefferson","Iara"];
+    const executores = ["", "Airton", "Damião", "Daniel", "Alison"];
+    const problemas = ["","Acesso Lento","Acréscimo de canais","Adição de equipamento","Ajuste no IPV6","Ativação de Link","Ativação de Telefonia","Cliente entrou em contato pedindo uma informação técnica","Falha elétrica no cliente","Falha elétrica no POP da Inovanet","Falha no equipamento da Inovanet","Falha no fornecimento de internet pela ALGAR","Falha no fornecimento de internet pela BR DIGITAL","Falha no link de transporte","Help Desk Presencial","Help Desk Remoto","Help Desk Telefonia","Implantar cabo de internet","Mudança de endereço","Mudança de Equipamentos","Mudança de Local do Aparelho","Operadora de telefonia com falha de rotas","Orçamento","Outros","Portabilidade da linha","Problema na Hybrid","Problemas com páginas","Problemas no VOIP","Recolher equipamento","Rompimento do Backbone em Natal","Rompimento do drop do cliente em Ceará-Mirim","Rompimento do drop do cliente em Mossoró","Rompimento do drop do cliente em Natal","Rompimento do drop do cliente em Parnamirim","Rompimento no drop em STO","Rompimento no transporte da Intelnet","Rompimento no transporte para Ceará-Mirim","Rompimento no transporte para São José de Mipibu","Sem Acesso","Sem ping","Solicitação BGP","Solicitação de linha nova","Troca de CEO","Troca de conector tipo click","Troca de conector tipo RJ45","Troca de CTO","Troca de DROP","Troca de fonte com defeito","Troca de splitter"];
+    const ncOpcoes = ["","2","4","5","8","15","17","18","21","22","24","26","27","36","37","40","43","44","48","50","51","54","55","60","65","67","69","73","76","78","80","87","88","96","102","104","108","109","110","115","123","124","130","132","135","137","140","143","144","145","146","148","151","152","153","155","156","157","158","160","161","162","165","169","170","171","174","180","181","182","184","185","187","188","189","190","191","195","196","197","198","201","204","205","210","211","212","213","214","215","216","217","220","222","223","224","225","228","229","232","235","236","238","240","241","242","243","245","246","247","248","251","254","255","257","260","262","263","264","270","275","276","280","283","285","286","289","290","295","297","298","302","303","305","306","308","309","310","311","315","316","317","318","319","321","322","323","324","325","327","328","330","332","334","338","340","342","343","347","352","353","354","358","359","360","361","365","368","369","370","371","374","388","389","390","391","393","394","396","399","403","404","405","406","407","408","409","410","413","414","416","417","418","421","422","424","425","427","428","431","432","433","434","435","436","437","438","439","440","441","442","444","445","446","447","448","449","450","451","452","453","454","456","457","462","463","465","466","467","469","470","471","475","476","478","479","480","483","484","485","489","490","491","492","493","494","495","496","498","499","500","501","505","506","507","509","510","511","512","514","515","516","517","518","519","520","521","522","523","524","527","529","531","532","534","535","536","537","538","539","549","550","551","552","553","555","557","559","565","570","571","572","573","574","575","576","577","579","580","582","583","584"
+];
+
+    let database = []; 
+    let timers = new Map();
+    let accumulatedTimes = new Map();
+
+    function login() {
+        const username = document.getElementById('username').value;
+        const password = document.getElementById('password').value;
+        
+        const user = users.find(u => u[0] === username && u[1] === password);
+        
+        if (user) {
+            // Apenas dados de login ficam no localStorage
+            sessionStorage.setItem('isLoggedIn', 'true');
+            sessionStorage.setItem('username', username);
+            
+            document.getElementById('loginContainer').style.display = 'none';
+            document.getElementById('mainContainer').style.display = 'block';
+            
+            // Carrega dados do servidor após login
+            loadArchivedTicketsFromServer();
+            loadOpenTicketsFromServer();
+        } else {
+            document.getElementById('loginError').textContent = 'Usuário ou senha incorretos';
+        }
+    }
+
+    function checkLoginState() {
+        const isLoggedIn = sessionStorage.getItem('isLoggedIn') === 'true';
+        
+        if (isLoggedIn) {
+            document.getElementById('loginContainer').style.display = 'none';
+            document.getElementById('mainContainer').style.display = 'block';
+            // Carrega dados do servidor
+            loadArchivedTicketsFromServer();
+            loadOpenTicketsFromServer();
+        } else {
+            document.getElementById('loginContainer').style.display = 'block';
+            document.getElementById('mainContainer').style.display = 'none';
+        }
+    }
+
+    function logout() {
+        sessionStorage.removeItem('isLoggedIn');
+        sessionStorage.removeItem('username');
+        document.getElementById('loginContainer').style.display = 'block';
+        document.getElementById('mainContainer').style.display = 'none';
+        
+        // Limpa dados locais ao fazer logout
+        database = [];
+        const ticketList = document.getElementById('ticketList');
+        ticketList.innerHTML = '';
+    }
+
+    function createSelect(options, id) {
+        const select = document.createElement('select');
+        select.id = id;
+        options.forEach(option => {
+            const opt = document.createElement('option');
+            opt.value = option;
+            opt.textContent = option;
+            select.appendChild(opt);
+        });
+        return select;
+    }
+
+    function addComment(ticketDiv) {
+        const comment = prompt('Digite seu comentário:');
+        if (comment) {
+            const ticketId = ticketDiv.dataset.ticketId;
+            // Comentários também poderiam ser salvos no servidor
+            alert('Comentário adicionado com sucesso!');
+        }
+    }
+
+    async function archiveTicket(ticketDiv) {
+        validatePasswordAndExecute(async (username) => {
+            const tempoPrevisto = ticketDiv.querySelector('input[type="text"]').value;
+            const horaInicio = ticketDiv.querySelector('input[id="hora_inicio"]').value;
+            const dataAbertura = ticketDiv.querySelector('input[id="data_abertura"]').value;
+            const horaFim = new Date().toLocaleTimeString();
+            const dataEncerramento = new Date().toLocaleDateString();
+
+            const dataHoraAbertura = `${dataAbertura} ${horaInicio}`;
+            
+            const startTime = parseDateTimeStr(dataHoraAbertura).getTime();
+            const endTime = new Date(`${dataEncerramento} ${horaFim}`).getTime();
+            const accumulatedTime = endTime - startTime;
+            const tempoDecorrido = calculateTotalTimeFromMilliseconds(accumulatedTime);
+
+            const tempoPrevistoSeconds = timeToSeconds(tempoPrevisto);
+            const tempoDecorridoSeconds = timeToSeconds(tempoDecorrido);
+
+            let statusPrazo;
+            const timerType = ticketDiv.getAttribute('data-timer-type');
+            if (timerType === 'T' && tempoDecorridoSeconds <= tempoPrevistoSeconds) {
+                statusPrazo = 'No Prazo';
+            } else {
+                statusPrazo = 'Fora do Prazo';
+            }
+
+            const ticket = {
+                id: ticketDiv.dataset.ticketId, // Importante para remoção
+                tempo_previsto: tempoPrevisto,
+                cliente: ticketDiv
+                .querySelector('select[id="CLIENTE"]').value,
+                problema: ticketDiv.querySelector('select[id="PROBLEMA"]').value,
+                operador: ticketDiv.querySelector('select[id="OPERADOR"]').value,
+                executor: ticketDiv.querySelector('select[id="EXECUTOR"]').value,
+                data_hora_abertura: dataHoraAbertura,
+                hora_fim: `${dataEncerramento} ${horaFim}`,
+                arquivado_por: username,
+                inicio: dataHoraAbertura,
+                fim: `${dataEncerramento} ${horaFim}`,
+                tempo_decorrido: tempoDecorrido,
+                status_prazo: statusPrazo
+            };
+
+            if (!ticket.cliente || !ticket.problema || !ticket.operador || !ticket.executor) {
+                alert('Por favor, preencha todos os campos obrigatórios antes de arquivar.');
+                return;
+            }
+
+            if (timers.has(ticketDiv)) {
+                clearInterval(timers.get(ticketDiv));
+                timers.delete(ticketDiv);
+            }
+
+            // Remove chamado aberto do servidor
+            await removeOpenTicketFromServer(ticket.id);
+
+            // Salva chamado arquivado no servidor
+            await saveArchivedTicketToServer(ticket);
+
+            ticketDiv.remove();
+
+            // Atualiza tabela de chamados arquivados
+            await loadArchivedTicketsFromServer();
+            updateDatabaseTable();
+
+            alert(`Chamado arquivado com sucesso!\n
+                Data de abertura: ${dataAbertura} Hora de abertura: ${horaInicio}\n
+                Data de encerramento: ${dataEncerramento} Hora de encerramento: ${horaFim}\n
+                Tempo de execução: ${tempoDecorrido}`);
+        });
+    }
+
+    function calculateTotalTimeFromMilliseconds(ms) {
+        const totalSeconds = Math.floor(ms / 1000);
+        const hours = Math.floor(totalSeconds / 3600);
+        const minutes = Math.floor((totalSeconds % 3600) / 60);
+        const seconds = totalSeconds % 60;
+        return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+    }
+
+    function parseDateTimeStr(dateTimeStr) {
+        if (!dateTimeStr) return null;
+        try {
+            if (dateTimeStr.includes(' ')) {
+                const [dateStr, timeStr] = dateTimeStr.split(' ');
+                const [day, month, year] = dateStr.split('/').map(Number);
+                const [hours, minutes, seconds] = timeStr.split(':').map(Number);
+                return new Date(year, month - 1, day, hours, minutes, seconds || 0);
+            }
+            const [day, month, year] = dateTimeStr.split('/').map(Number);
+            return new Date(year, month - 1, day);
+        } catch (e) {
+            console.error('Erro ao converter data:', dateTimeStr, e);
+            return null;
+        }
+    }
+
+    function timeToSeconds(timeStr) {
+        if (!timeStr) return 0;
+        const parts = timeStr.split(':').map(Number);
+        while (parts.length < 3) parts.unshift(0);
+        return parts[0] * 3600 + parts[1] * 60 + parts[2];
+    }
+
+    function updateTimerDisplay(display, time, prefix) {
+        const hours = Math.floor(time / 3600);
+        const minutes = Math.floor((time % 3600) / 60);
+        const seconds = Math.floor(time % 60);
+        display.textContent = `${prefix}: ${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+    }
+
+    function updateTicketColor(ticketDiv, percentage) {
+        ticketDiv.className = 'ticket-row';
+        if (percentage > 0.75) {
+            ticketDiv.classList.add('green');
+        } else if (percentage > 0.5) {
+            ticketDiv.classList.add('yellow');
+        } else if (percentage > 0.2) {
+            ticketDiv.classList.add('orange');
+        } else {
+            ticketDiv.classList.add('red');
+        }
+    }
+
+    function startTimer(ticketDiv, resumeFrom = null) {
+        const timerDisplay = ticketDiv.querySelector('.timer');
+        const tsInput = ticketDiv.querySelector('.input-time');
+        const ts = timeToSeconds(tsInput.value || '0:0:0');
+        let timeLeft = resumeFrom !== null ? resumeFrom : ts;
+        let timerType = ticketDiv.getAttribute('data-timer-type');
+
+        if (timers.has(ticketDiv)) {
+            clearInterval(timers.get(ticketDiv));
+        }
+
+        const startTime = Date.now();
+        ticketDiv.setAttribute('data-start-time', startTime);
+
+        const timer = setInterval(() => {
+            if (timerType === 'T' && timeLeft > 0) {
+                timeLeft--;
+                updateTimerDisplay(timerDisplay, timeLeft, 'T');
+                updateTicketColor(ticketDiv, timeLeft / ts);
+
+                if (timeLeft === 0) {
+                    timerType = 'A';
+                    ticketDiv.setAttribute('data-timer-type', 'A');
+                    timeLeft = 0;
+                    ticketDiv.classList.add('red');
+                }
+            } else {
+                timeLeft++;
+                updateTimerDisplay(timerDisplay, timeLeft, 'A');
+                ticketDiv.classList.add('red');
+            }
+        }, 1000);
+
+        timers.set(ticketDiv, timer);
+    }
+
+    function validatePasswordAndExecute(callback) {
+        const username = prompt('Digite seu nome de usuário:');
+        const password = prompt('Digite sua senha:');
+        const user = users.find(u => u[0] === username && u[1] === password);
+        if (user) {
+            callback(username);
+        } else {
+            alert('Usuário ou senha incorretos!');
+        }
+    }
+
+    function handleTicketAction(action, ticketDiv) {
+    switch(action) {
+        case 'iniciar':
+            validatePasswordAndExecute(() => {
+                if (ticketDiv.getAttribute('data-timer-state') === 'stopped') {
+                    const tsInput = ticketDiv.querySelector('.input-time');
+                    if (!tsInput || !tsInput.value || !/^\d{1,2}:\d{1,2}:\d{1,2}$/.test(tsInput.value)) {
+                        alert('Por favor, insira um tempo válido no formato H:M:S');
+                        return;
+                    }
+                    startTimer(ticketDiv);
+                    ticketDiv.setAttribute('data-timer-state', 'running');
+
+                    // DESABILITAR inputs/selects
+                    ticketDiv.querySelectorAll('input, select').forEach(el => {
+                        el.disabled = true;
+                    });
+
+                    // ESCONDER labels
+                    ticketDiv.querySelectorAll('.ticket-label').forEach(label => {
+                        label.style.display = 'none';
+                    });
+
+                    // DEIXAR CHAMADO COMPACTO (só botões/timer em linha)
+                    ticketDiv.classList.add('compact');
+                    const buttonContainer = ticketDiv.querySelector('.button-container');
+                    if (buttonContainer) buttonContainer.classList.add('compact');
+                    const timerDisplay = ticketDiv.querySelector('.timer');
+                    if (timerDisplay) timerDisplay.style.fontSize = '1em';
+
+                    const novoTicket = getOpenTicketFromDOM(ticketDiv);
+                    saveOpenTicketToServer(novoTicket);
+                }
+            });
+            break;
+        case 'arquivar':
+            archiveTicket(ticketDiv);
+            break;
+        case 'comentar':
+            addComment(ticketDiv);
+            break;
+    }
+}
+
+    function getOpenTicketFromDOM(ticketDiv) {
+        return {
+            id: ticketDiv.dataset.ticketId,
+            tempo_previsto: ticketDiv.querySelector('input[type="text"]').value,
+            cliente: ticketDiv.querySelector('select[id="CLIENTE"]').value,
+            problema: ticketDiv.querySelector('select[id="PROBLEMA"]').value,
+            operador: ticketDiv.querySelector('select[id="OPERADOR"]').value,
+            executor: ticketDiv.querySelector('select[id="EXECUTOR"]').value,
+            hora_inicio: ticketDiv.querySelector('input[id="hora_inicio"]').value,
+            data_abertura: ticketDiv.querySelector('input[id="data_abertura"]').value,
+            hora_fim: ticketDiv.querySelector('input[id="hora_fim"]').value,
+            timerState: ticketDiv.getAttribute('data-timer-state'),
+            timerType: ticketDiv.getAttribute('data-timer-type'),
+            accumulatedTime: ticketDiv.getAttribute('data-accumulated-time'),
+            startTime: ticketDiv.getAttribute('data-start-time')
+        };
+    }
+
+    function addNewTicketToDOM(ticket = {}) {
+        const ticketList = document.getElementById('ticketList');
+        if (!ticketList) {
+            console.error('Ticket list container not found');
+            return;
+        }
+
+        const ticketDiv = document.createElement('div');
+        ticketDiv.className = 'ticket-row';
+        // Se já tem id, mantém, senão gera um novo
+        ticketDiv.dataset.ticketId = ticket.id || (Date.now() + '-' + Math.random().toString(36).substr(2, 9));
+
+        const fields = {
+    tempo_previsto: document.createElement('input'),
+    CLIENTE: createSelect(ncOpcoes, 'CLIENTE'),
+    PROBLEMA: createSelect(problemas, 'PROBLEMA'),
+    OPERADOR: createSelect(operadores, 'OPERADOR'),
+    EXECUTOR: createSelect(executores, 'EXECUTOR')
+};
+
+        fields.tempo_previsto.type = 'text';
+        fields.tempo_previsto.className = 'input-time';
+        fields.tempo_previsto.placeholder = 'H:M:S';
+        fields.tempo_previsto.value = ticket.tempo_previsto || '';
+
+        fields.tempo_previsto.addEventListener('input', function (e) {
+            e.target.value = e.target.value.replace(/[^0-9:]/g, '');
+        });
+
+        fields.tempo_previsto.addEventListener('blur', function (e) {
+            if (e.target.value) {
+                let parts = e.target.value.split(':');
+                parts = parts.map(part => part.padStart(2, '0'));
+                while (parts.length < 3) parts.push('00');
+                e.target.value = parts.slice(0, 3).join(':');
+            }
+        });
+
+
+        fields.CLIENTE.value = ticket.cliente || '';
+        fields.PROBLEMA.value = ticket.problema || '';
+        fields.OPERADOR.value = ticket.operador || '';
+        fields.EXECUTOR.value = ticket.executor || '';
+
+Object.entries(fields).forEach(([key, field]) => {
+    const label = document.createElement('label');
+    label.textContent = {
+        tempo_previsto: 'TEMPO PREVISTO:'
+    }[key] || key.toUpperCase() + ':';
+    label.className = 'ticket-label'; // <--- aqui!
+    ticketDiv.appendChild(label);
+    ticketDiv.appendChild(field);
+});
+
+        const timerDisplay = document.createElement('div');
+        timerDisplay.className = 'timer';
+        const timerType = ticket.timerType || 'T';
+        const accumulatedTime = parseInt(ticket.accumulatedTime, 10) || 0;
+        updateTimerDisplay(timerDisplay, accumulatedTime, timerType);
+        ticketDiv.setAttribute('data-timer-type', timerType);
+        ticketDiv.setAttribute('data-timer-state', ticket.timerState || 'stopped');
+        ticketDiv.setAttribute('data-accumulated-time', accumulatedTime.toString());
+        ticketDiv.setAttribute('data-start-time', ticket.startTime || '');
+
+        const buttonContainer = document.createElement('div');
+        const buttonActions = [
+            { icon: 'fas fa-play', handler: 'iniciar' },
+            { icon: 'fas fa-archive', handler: 'arquivar' },
+            { icon: 'fas fa-comment', handler: 'comentar' }
+        ];
+
+        buttonActions.forEach(({ icon, handler }) => {
+            const button = document.createElement('button');
+            button.innerHTML = `<i class="${icon}"></i>`;
+            button.onclick = () => handleTicketAction(handler, ticketDiv);
+            buttonContainer.appendChild(button);
+        });
+
+        ticketDiv.appendChild(timerDisplay);
+        ticketDiv.appendChild(buttonContainer);
+        ticketList.appendChild(ticketDiv);
+
+        // Se o timer estava rodando, restaura
+        if (ticket.timerState === 'running') {
+            startTimer(ticketDiv, accumulatedTime);
+        }
+    }
+
+    async function addNewTicket(ticket = {}) {
+    addNewTicketToDOM(ticket);
+    const ticketList = document.getElementById('ticketList');
+    const ticketDiv = ticketList.lastElementChild;
+    const novoTicket = getOpenTicketFromDOM(ticketDiv);
+    await saveOpenTicketToServer(novoTicket);
+}
+
+    document.addEventListener('DOMContentLoaded', () => {
+        checkLoginState();
+        flatpickr("#filterDateRange", {
+            mode: "range",
+            dateFormat: "d/m/Y",
+            locale: "pt",
+            onChange: function(selectedDates, dateStr, instance) {
+                console.log('Datas selecionadas:', dateStr);
+            }
+        });
+        initializeWebSocket();
+    });
+
+</script>
+</body>
+</html>
