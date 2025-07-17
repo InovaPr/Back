@@ -322,11 +322,11 @@
 </div>
 
 <script>
-    const API_URL = 'https://seu-backend.onrender.com';
+    const API_URL = 'https://back-evo3.onrender.com';
     let socket;
 
     function initializeWebSocket() {
-        socket = new WebSocket('wss://inovanet.ind.br/websocket');
+        socket = new WebSocket('wss://back-evo3.onrender.com');
 
         socket.onopen = () => {
             console.log('Conexão WebSocket estabelecida');
@@ -357,11 +357,11 @@
 
     async function saveOpenTicketToServer(ticket) {
     try {
-        await fetch('http://192.168.0.31:3000/chamados_abertos', {
+        await fetch(`${API_URL}/chamados_abertos`, {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify(ticket)
-        });
+});
         console.log('Chamado aberto salvo no servidor');
     } catch (error) {
         console.error('Erro ao salvar chamado aberto:', error);
@@ -371,7 +371,7 @@
     // SERVIDOR: Buscar chamados abertos do servidor
  async function loadOpenTicketsFromServer() {
     try {
-        const response = await fetch('http://192.168.0.31:3000/chamados_abertos');
+        const response = await fetch(`${API_URL}/chamados_abertos`);
         const openTickets = await response.json();
         const ticketList = document.getElementById('ticketList');
         ticketList.innerHTML = '';
@@ -383,7 +383,7 @@
 // Função para buscar chamados abertos no backend e exibir na tela
 async function loadArchivedTicketsFromServer() {
     try {
-        const response = await fetch('http://192.168.0.31:3000/chamados_arquivados');
+        const response = await fetch(`${API_URL}/chamados_arquivados`);
         const archivedTickets = await response.json();
         database = archivedTickets; // Atualiza o database local com dados do servidor
         console.log('Chamados arquivados carregados do servidor:', database.length);
@@ -423,7 +423,7 @@ async function addNewTicket(ticket = {}) {
     // SERVIDOR: Remover chamado aberto do servidor (quando arquivar)
     async function removeOpenTicketFromServer(ticketId) {
         try {
-           await fetch(`http://192.168.0.31:3000/chamados_abertos/${ticketId}`, {
+           await fetch(`${API_URL}/chamados_abertos/${ticketId}`, {
     method: 'DELETE'
 });
             console.log('Chamado aberto removido do servidor');
@@ -434,15 +434,15 @@ async function addNewTicket(ticket = {}) {
 
     // SERVIDOR: Limpar banco de dados no servidor
     async function clearDatabaseOnServer() {
-        try {
-          await fetch('http://192.168.0.31:3000/chamados_arquivados', {
-    method: 'DELETE'
-});
-            console.log('Banco de dados limpo no servidor');
-        } catch (error) {
-            console.error('Erro ao limpar banco de dados:', error);
-        }
+    try {
+      await fetch(`${API_URL}/chamados_abertos`, {
+        method: 'DELETE'
+      });
+      console.log('Banco de dados limpo no servidor');
+    } catch (error) {
+      console.error('Erro ao limpar banco de dados:', error);
     }
+}
 
     function updateTicket(ticket) {
         const ticketDiv = document.querySelector(`[data-ticket-id="${ticket.id}"]`);
